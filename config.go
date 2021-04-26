@@ -20,8 +20,10 @@ type config struct {
 	TimeoutShutdown time.Duration `yaml:"timeout_shutdown"`
 
 	Tenant struct {
-		Label       string
-		LabelRemove bool `yaml:"label_remove"`
+		Label       string `yaml:"label,omitempty"`
+		LabelRemove bool `yaml:"label_remove,omitempty"`
+		NamespaceLabel string `yaml:"namespace_label,omitempty"`
+		QueryInterval int `yaml:"query_interval,omitempty"`
 		Header      string
 		Default     string
 	}

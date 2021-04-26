@@ -26,6 +26,7 @@ type result struct {
 
 type processor struct {
 	cfg config
+	k8s k8snspoller
 
 	srv *fh.Server
 	cli *fh.Client
@@ -35,9 +36,10 @@ type processor struct {
 	logger.Logger
 }
 
-func newProcessor(c config) *processor {
+func newProcessor(c config, k8s k8snspoller) *processor {
 	p := &processor{
 		cfg:    c,
+		k8s:    k8s,
 		Logger: logger.NewSimpleLogger("proc"),
 	}
 
@@ -228,23 +230,34 @@ func (p *processor) dispatch(clientIP net.Addr, reqID uuid.UUID, m map[string]*p
 }
 
 func (p *processor) processTimeseries(ts *prompb.TimeSeries) (tenant string, err error) {
-	idx := 0
-	for i, l := range ts.Labels {
-		if l.Name == p.cfg.Tenant.Label {
-			tenant, idx = l.Value, i
-			break
+	var idx int
+	if p.cfg.Tenant.NamespaceLabel != "" {
+		for _, l := range ts.Labels {
+			if l.Name == "namespace" {
+				tenant = p.k8s.nstenant[l.Value]
+				break
+			}
+		}
+	} else {	
+		idx = 0
+		for i, l := range ts.Labels {
+			if l.Name == p.cfg.Tenant.Label {
+				tenant, idx = l.Value, i
+				break
+			}
 		}
 	}
-
+		
 	if tenant == "" {
 		if p.cfg.Tenant.Default == "" {
-			return "", fmt.Errorf("Label '%s' not found", p.cfg.Tenant.Label)
+			return "", fmt.Errorf("label '%s' not found", p.cfg.Tenant.Label)
 		}
 
 		return p.cfg.Tenant.Default, nil
 	}
 
-	if p.cfg.Tenant.LabelRemove {
+	// Remove label if label_remove = true
+	if p.cfg.Tenant.LabelRemove && p.cfg.Tenant.NamespaceLabel == ""{
 		l := len(ts.Labels)
 		ts.Labels[idx] = ts.Labels[l-1]
 		ts.Labels = ts.Labels[:l-1]

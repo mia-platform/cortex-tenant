@@ -26,6 +26,14 @@ This proxy solves the problem using the following logic:
 - Groups timeseries by tenant
 - Issues a number of parallel per-tenant HTTP requests to Cortex with the relevant tenant HTTP header (`X-Scope-OrgID` by default)
 
+Setting `namespace_label` will modify this logic:
+
+- It may be possibile to label a namespace (`namespace_label`) with the tenant name, all metrics in this namespace will be dedicated to this tenant
+- Is built a map `namespace: tenant_name` ( updated periodically )
+- Receive Prometheus remote write
+- If label `namespace` is found in incoming timeseries, this value will be evalueted against the map to find the correct tenant_name
+- If on the namespace there is not `namespace_label` or label namespace is not present on timeseries, tenat_name will fallback to what defined in `default`
+
 ## Usage
 
 - Get `rpm` or `deb` for amd64 from the Releases page. For building see below.
@@ -60,6 +68,11 @@ tenant:
   label: tenant
   # Whether to remove the tenant label from the request
   label_remove: true
+  # Instead if defined looks for the following namespace label for determine the tenant
+  # if defined label and label_remove will be ignored
+  namespace_label: "tenant"
+  # Update interval query for namespace label in seconds
+  query_interval: 60
   # To which header to add the tenant ID
   header: X-Scope-OrgID
   # Which tenant ID to use if the label is missing in any of the timeseries

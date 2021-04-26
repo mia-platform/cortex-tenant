@@ -2,12 +2,11 @@ package main
 
 import (
 	"flag"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
-
-	"net/http"
-	_ "net/http/pprof"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -17,6 +16,7 @@ var (
 )
 
 func main() {
+
 	cfgFile := flag.String("config", "", "Path to a config file")
 	flag.Parse()
 
@@ -46,7 +46,24 @@ func main() {
 		log.SetLevel(lvl)
 	}
 
-	proc := newProcessor(*cfg)
+
+	var k8s *k8snspoller
+	if cfg.Tenant.NamespaceLabel != "" {
+		k8s, err = newK8snspoller(cfg.Tenant.NamespaceLabel)
+		if err != nil {
+			log.Fatalf("Unable to create k8s Ns Poller: %s", err)
+		}
+		
+		go func() {
+			for range time.Tick(time.Duration(cfg.Tenant.QueryInterval) * time.Second ) {
+				log.Debug("Call k8s for update ns labels")
+				k8s.updateMap()
+			}
+			}()
+	}
+
+	proc := newProcessor(*cfg, *k8s)
+
 
 	if err = proc.run(); err != nil {
 		log.Fatalf("Unable to start: %s", err)

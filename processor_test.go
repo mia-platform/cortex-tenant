@@ -123,8 +123,9 @@ func createProcessor() (*processor, error) {
 	if err != nil {
 		return nil, err
 	}
+	var k8s *k8snspoller = &k8snspoller{}
 
-	return newProcessor(*cfg), nil
+	return newProcessor(*cfg, *k8s), nil
 }
 
 func sinkHandlerError(ctx *fh.RequestCtx) {
@@ -159,8 +160,9 @@ func Test_handle(t *testing.T) {
 	cfg.pipeIn = fhu.NewInmemoryListener()
 	cfg.pipeOut = fhu.NewInmemoryListener()
 	cfg.Tenant.LabelRemove = true
+	var k8s *k8snspoller = &k8snspoller{}
 
-	p := newProcessor(*cfg)
+	p := newProcessor(*cfg, *k8s)
 	err = p.run()
 	assert.Nil(t, err)
 
@@ -300,8 +302,12 @@ func Test_processTimeseries(t *testing.T) {
 	assert.Nil(t, err)
 	cfg.Tenant.LabelRemove = true
 
-	p := newProcessor(*cfg)
-	assert.Nil(t, err)
+	var k8s *k8snspoller = &k8snspoller{}
+
+	p := newProcessor(*cfg, *k8s)
+
+	assert.Equal(t, p.cfg.Tenant.NamespaceLabel, "")
+	assert.Equal(t, p.cfg.Tenant.Label, "__tenant__")
 
 	ten, err := p.processTimeseries(&testTS4)
 	assert.Nil(t, err)
@@ -312,10 +318,10 @@ func Test_processTimeseries(t *testing.T) {
 	assert.Equal(t, "default", ten)
 
 	cfg.Tenant.Default = ""
-	p = newProcessor(*cfg)
+	p = newProcessor(*cfg, *k8s)
 	assert.Nil(t, err)
 
-	ten, err = p.processTimeseries(&testTS3)
+	_, err = p.processTimeseries(&testTS3)
 	assert.NotNil(t, err)
 }
 
