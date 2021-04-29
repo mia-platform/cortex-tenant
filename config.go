@@ -2,9 +2,13 @@ package main
 
 import (
 	"io/ioutil"
+	"net/url"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	fhu "github.com/valyala/fasthttp/fasthttputil"
 	"gopkg.in/yaml.v2"
 )
@@ -49,6 +53,19 @@ func configParse(b []byte) (*config, error) {
 	if cfg.Tenant.Label == "" {
 		cfg.Tenant.Label = "__tenant__"
 	}
+
+	AUTH_USER_PASS := os.Getenv("AUTH_USER_PASS")
+
+	u, err := url.Parse(cfg.Target)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if AUTH_USER_PASS != "" {
+		u.User = url.UserPassword(strings.Split(AUTH_USER_PASS, ":")[0], strings.Split(AUTH_USER_PASS, ":")[1])
+	}
+
+	cfg.Target = u.String()
 
 	return cfg, nil
 }

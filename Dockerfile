@@ -25,6 +25,7 @@ ARG COMMIT_SHA=<not-specified>
 WORKDIR /app
 
 COPY --from=builder /app/* ./
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
 # Use an unprivileged user.
 USER 1000
