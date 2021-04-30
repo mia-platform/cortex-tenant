@@ -57,7 +57,10 @@ func main() {
 		go func() {
 			for range time.Tick(time.Duration(cfg.Tenant.QueryInterval) * time.Second ) {
 				log.Debug("Call k8s for update ns labels")
-				k8s.updateMap()
+				err := k8s.updateMap()
+				if err != nil {
+					log.Error("Unable to call Api-Server: %s", err)
+				}
 			}
 			}()
 	}
