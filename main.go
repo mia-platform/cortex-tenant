@@ -53,7 +53,11 @@ func main() {
 		if err != nil {
 			log.Fatalf("Unable to create k8s Ns Poller: %s", err)
 		}
-		
+		log.Debug("Call k8s for update ns labels on startup")
+		err := k8s.updateMap()
+		if err != nil {
+			log.Error("Unable to call Api-Server: %s", err)
+		}
 		go func() {
 			for range time.Tick(time.Duration(cfg.Tenant.QueryInterval) * time.Second ) {
 				log.Debug("Call k8s for update ns labels")
