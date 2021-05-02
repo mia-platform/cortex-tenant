@@ -12,6 +12,12 @@ OUT := .out
 
 all: rpm
 
+test:
+	go test ./...
+
+bench:
+	go test --bench=.
+	
 build:
 	go test ./... && \
 	GOARCH=amd64 \
