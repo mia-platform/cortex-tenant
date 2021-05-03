@@ -57,7 +57,7 @@ func waitTimeout(wg *sync.WaitGroup, timeout time.Duration) bool {
 func Test_flushing_times(t *testing.T){
     var waitGroup sync.WaitGroup
 	waitGroup.Add(2)
-	mc := func(timeseries []*prompb.TimeSeries) error { waitGroup.Done();return nil;}
+	mc := func(timeseries []*prompb.TimeSeries) error {waitGroup.Done();return nil;}
 	wk := createWorker("testA")
 	wk.sender = mc
 	wk.batchsize = 5
@@ -68,7 +68,7 @@ func Test_flushing_times(t *testing.T){
 		tschan <- &prompb.TimeSeries{Samples: testTS1.Samples}
 	}
 	if waitTimeout(&waitGroup, time.Second) {
-		// expected exactly 2 flush, if here flush < 2
+		t.Log("wait timeout - expected exactly 2 flush")
 		t.FailNow()
 	}
 }

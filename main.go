@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -45,32 +44,17 @@ func main() {
 
 		log.SetLevel(lvl)
 	}
+	
+	var disp *dispatcher
+	proc := newProcessor(*cfg, *disp)
 
-
-	var k8s *k8snspoller
 	if cfg.Tenant.NamespaceLabel != "" {
-		k8s, err = newK8snspoller(cfg.Tenant.NamespaceLabel)
+		disp, err = newdispatcher(cfg.Tenant.NamespaceLabel, cfg.Tenant.QueryInterval, proc)
 		if err != nil {
-			log.Fatalf("Unable to create k8s Ns Poller: %s", err)
+			log.Fatalf("Unable to create k8s poller: %s", err)
 		}
-		log.Debug("Call k8s for update ns labels on startup")
-		err := k8s.updateMap()
-		if err != nil {
-			log.Error("Unable to call Api-Server: %s", err)
-		}
-		go func() {
-			for range time.Tick(time.Duration(cfg.Tenant.QueryInterval) * time.Second ) {
-				log.Debug("Call k8s for update ns labels")
-				err := k8s.updateMap()
-				if err != nil {
-					log.Error("Unable to call Api-Server: %s", err)
-				}
-			}
-			}()
+		go disp.run()
 	}
-
-	proc := newProcessor(*cfg, *k8s)
-
 
 	if err = proc.run(); err != nil {
 		log.Fatalf("Unable to start: %s", err)

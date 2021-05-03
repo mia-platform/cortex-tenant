@@ -35,6 +35,7 @@ type Worker struct {
     tenant string
     buffer []*prompb.TimeSeries
     sender timeseries_sender
+    proc *processor
 }
 
 func send_timeseries(timeseries []*prompb.TimeSeries) error {
@@ -42,13 +43,14 @@ func send_timeseries(timeseries []*prompb.TimeSeries) error {
     return nil
 }
 
-func createWorker(tenant string) *Worker{
+func createWorker(tenant string, proc *processor) *Worker{
     return &Worker{
         batchsize: BATCHSIZE,
         timeout: TIMEOUT,
         tenant: tenant,
         buffer: make([]*prompb.TimeSeries, 0, BATCHSIZE),
         sender: send_timeseries,
+        proc: proc,
     }
 }
 

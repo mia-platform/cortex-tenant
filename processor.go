@@ -12,7 +12,6 @@ import (
 	"github.com/gogo/protobuf/proto"
 	"github.com/golang/snappy"
 	"github.com/google/uuid"
-	me "github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	"github.com/prometheus/prometheus/prompb"
 	fh "github.com/valyala/fasthttp"
@@ -26,7 +25,7 @@ type result struct {
 
 type processor struct {
 	cfg config
-	k8s k8snspoller
+	disp dispatcher
 
 	srv *fh.Server
 	cli *fh.Client
@@ -36,10 +35,10 @@ type processor struct {
 	logger.Logger
 }
 
-func newProcessor(c config, k8s k8snspoller) *processor {
+func newProcessor(c config, disp dispatcher) *processor {
 	p := &processor{
 		cfg:    c,
-		k8s:    k8s,
+		disp:    disp,
 		Logger: logger.NewSimpleLogger("proc"),
 	}
 
@@ -123,39 +122,46 @@ func (p *processor) handle(ctx *fh.RequestCtx) {
 		return
 	}
 
-	clientIP := ctx.RemoteAddr()
-	reqID, _ := uuid.NewRandom()
-
-	m, err := p.createWriteRequests(wrReqIn)
-	if err != nil {
-		ctx.Error(err.Error(), fh.StatusBadRequest)
-		return
-	}
-
-	var errs *me.Error
-	results := p.dispatch(clientIP, reqID, m)
-
-	for _, r := range results {
-		if r.err != nil {
-			errs = me.Append(errs, r.err)
-			p.Errorf("src=%s %s", clientIP, r.err)
-		} else if r.code < 200 || r.code >= 300 {
-			errs = me.Append(errs, fmt.Errorf("HTTP code %d (%s)", r.code, string(r.body)))
-			p.Errorf("src=%s req_id=%s HTTP code %d (%s)", clientIP, reqID, r.code, string(r.body))
+	for _, ts := range wrReqIn.Timeseries {
+		tenant, err := p.processTimeseries(&ts)
+		if err != nil {
+			ctx.Error(err.Error(), fh.StatusInternalServerError)
+			return
 		}
+		p.disp.nstschan[tenant] <- &ts
 	}
 
-	// Return 500 for any error
-	if errs.ErrorOrNil() != nil {
-		ctx.Error(errs.Error(), fh.StatusInternalServerError)
-		return
-	}
+	clientIP := ctx.RemoteAddr()
+	// reqID, _ := uuid.NewRandom()
 
-	// Otherwise if all went fine return the code and body from 1st request
-	ctx.SetBody(results[0].body)
-	ctx.SetStatusCode(results[0].code)
+	// m, err := p.createWriteRequests(wrReqIn)
+	// if err != nil {
+	// 	ctx.Error(err.Error(), fh.StatusBadRequest)
+	// 	return
+	// }
 
-	return
+	// var errs *me.Error
+	// results := p.dispatch(clientIP, reqID, m)
+
+	// for _, r := range results {
+	// 	if r.err != nil {
+	// 		errs = me.Append(errs, r.err)
+	// 		p.Errorf("src=%s %s", clientIP, r.err)
+	// 	} else if r.code < 200 || r.code >= 300 {
+	// 		errs = me.Append(errs, fmt.Errorf("HTTP code %d (%s)", r.code, string(r.body)))
+	// 		p.Errorf("src=%s req_id=%s HTTP code %d (%s)", clientIP, reqID, r.code, string(r.body))
+	// 	}
+	// }
+
+	// // Return 500 for any error
+	// if errs.ErrorOrNil() != nil {
+	// 	ctx.Error(errs.Error(), fh.StatusInternalServerError)
+	// 	return
+	// }
+
+	// // Otherwise if all went fine return the code and body from 1st request
+	// ctx.SetBody(results[0].body)
+	ctx.SetStatusCode(fh.StatusOK)
 }
 
 func (p *processor) createWriteRequests(wrReqIn *prompb.WriteRequest) (map[string]*prompb.WriteRequest, error) {
@@ -234,7 +240,7 @@ func (p *processor) processTimeseries(ts *prompb.TimeSeries) (tenant string, err
 	if p.cfg.Tenant.NamespaceLabel != "" {
 		for _, l := range ts.Labels {
 			if l.Name == "namespace" {
-				tenant = p.k8s.nstenant[l.Value]
+				tenant = p.disp.nstenant[l.Value]
 				break
 			}
 		}
