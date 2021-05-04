@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"time"
 
 	"github.com/golang/snappy"
@@ -50,43 +51,61 @@ func marshal(wr *prompb.WriteRequest) (bufOut []byte, err error) {
 }
 
 
-func send_timeseries(proc *processor, tenant string, timeseries []prompb.TimeSeries) (code int, body []byte, err error) {
-    req := fh.AcquireRequest()
-	resp := fh.AcquireResponse()
+func send_timeseries(proc *processor, tenant string, timeseries []prompb.TimeSeries) (int, []byte, error) {
+	for c := 0; c < 10; c++ {
+        var code int
+        var body []byte
+        var err error
+        req := fh.AcquireRequest()
+        resp := fh.AcquireResponse()
 
-    defer func() {
-		fh.ReleaseRequest(req)
-		fh.ReleaseResponse(resp)
-	}()
+        defer func() {
+            fh.ReleaseRequest(req)
+            fh.ReleaseResponse(resp)
+        }()
 
-    wr := prompb.WriteRequest{
-        Timeseries: timeseries,
+        wr := prompb.WriteRequest{
+            Timeseries: timeseries,
+        }
+
+        buf, err := marshal(&wr)
+        if err != nil {
+            return code, body, err
+        }
+
+        req.Header.SetMethod("POST")
+        req.Header.Set("Content-Encoding", "snappy")
+        req.Header.Set("Content-Type", "application/x-protobuf")
+        req.Header.Set("X-Prometheus-Remote-Write-Version", "0.1.0")
+        req.Header.Set(proc.cfg.Tenant.Header, tenant)
+        req.SetRequestURI(proc.cfg.Target)
+        req.SetBody(buf)
+        if err = proc.cli.DoTimeout(req, resp, proc.cfg.Timeout); err != nil {
+            log.Warnf("Error on do timeout: %s", err)
+            return code, body, err
+        }
+
+        code = resp.Header.StatusCode()
+        body = make([]byte, len(resp.Body()))
+        copy(body, resp.Body())
+
+        if code == 429 {
+            // resp.Header.VisitAll(func (key, value []byte) {
+            //     log.Printf("Headers: %v: %v", string(key), string(value))
+            // })
+            time.Sleep(500)
+            continue
+        }
+        
+        if code != fh.StatusOK {
+            log.Errorf("Error on senting writerequest to Cortex: code %d Body %s", code, body)
+            return code, body, err
+        }
+        if code == fh.StatusOK {
+            return code, body, err
+        }
     }
-
-	buf, err := marshal(&wr)
-	if err != nil {
-		return
-	}
-
-    req.Header.SetMethod("POST")
-	req.Header.Set("Content-Encoding", "snappy")
-	req.Header.Set("Content-Type", "application/x-protobuf")
-	req.Header.Set("X-Prometheus-Remote-Write-Version", "0.1.0")
-	req.Header.Set(proc.cfg.Tenant.Header, tenant)
-	req.SetRequestURI(proc.cfg.Target)
-	req.SetBody(buf)
-	if err = proc.cli.DoTimeout(req, resp, proc.cfg.Timeout); err != nil {
-		return
-	}
-
-	code = resp.Header.StatusCode()
-	body = make([]byte, len(resp.Body()))
-	copy(body, resp.Body())
-
-    if code != fh.StatusOK {
-        log.Errorf("Error on senting writerequest to Cortex: code %d Body %s", code, body)
-    }
-    return
+    return 0, nil, errors.New("finished retry attemps")
 }
 
 func createWorker(tenant string, proc *processor) *Worker{
