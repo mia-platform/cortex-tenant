@@ -46,7 +46,7 @@ func main() {
 	}
 	
 	var disp *dispatcher
-	proc := newProcessor(*cfg, *disp)
+	proc := newProcessor(*cfg, disp)
 
 	if cfg.Tenant.NamespaceLabel != "" {
 		disp, err = newdispatcher(cfg.Tenant.NamespaceLabel, cfg.Tenant.QueryInterval, proc)
@@ -55,6 +55,7 @@ func main() {
 		}
 		go disp.run()
 	}
+	proc.disp = disp // FIXME please
 
 	if err = proc.run(); err != nil {
 		log.Fatalf("Unable to start: %s", err)

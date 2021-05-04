@@ -19,7 +19,7 @@ bench:
 	go test --bench=.
 	
 build:
-	go test ./... && \
+	# go test ./... && \
 	GOARCH=amd64 \
 	GOOS=linux \
 	$(GO) build -ldflags "-s -w -extldflags \"-static\" -X main.version=$(VERSION)"

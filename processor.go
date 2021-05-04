@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/prometheus/prometheus/prompb"
+	log "github.com/sirupsen/logrus"
 	fh "github.com/valyala/fasthttp"
 )
 
@@ -25,7 +26,7 @@ type result struct {
 
 type processor struct {
 	cfg config
-	disp dispatcher
+	disp *dispatcher
 
 	srv *fh.Server
 	cli *fh.Client
@@ -35,7 +36,7 @@ type processor struct {
 	logger.Logger
 }
 
-func newProcessor(c config, disp dispatcher) *processor {
+func newProcessor(c config, disp *dispatcher) *processor {
 	p := &processor{
 		cfg:    c,
 		disp:    disp,
@@ -122,16 +123,21 @@ func (p *processor) handle(ctx *fh.RequestCtx) {
 		return
 	}
 
+	log.Debugf("incoming timeseries numbers: %d", len(wrReqIn.Timeseries))
+
 	for _, ts := range wrReqIn.Timeseries {
 		tenant, err := p.processTimeseries(&ts)
 		if err != nil {
 			ctx.Error(err.Error(), fh.StatusInternalServerError)
 			return
 		}
-		p.disp.nstschan[tenant] <- &ts
+		_, ok := p.disp.nstschan[tenant]
+		if !ok {
+			log.Errorf("Not found chan for tenant: %s", tenant)
+		}
+		p.disp.nstschan[tenant] <- ts
 	}
-
-	clientIP := ctx.RemoteAddr()
+	// clientIP := ctx.RemoteAddr()
 	// reqID, _ := uuid.NewRandom()
 
 	// m, err := p.createWriteRequests(wrReqIn)
@@ -290,8 +296,8 @@ func (p *processor) send(clientIP net.Addr, reqID uuid.UUID, tenant string, wr *
 	req.Header.Set("Content-Encoding", "snappy")
 	req.Header.Set("Content-Type", "application/x-protobuf")
 	req.Header.Set("X-Prometheus-Remote-Write-Version", "0.1.0")
-	req.Header.Set("X-Cortex-Tenant-Client", clientIP.String())
-	req.Header.Set("X-Cortex-Tenant-ReqID", reqID.String())
+	// req.Header.Set("X-Cortex-Tenant-Client", clientIP.String())
+	// req.Header.Set("X-Cortex-Tenant-ReqID", reqID.String())
 	req.Header.Set(p.cfg.Tenant.Header, tenant)
 
 	req.SetRequestURI(p.cfg.Target)

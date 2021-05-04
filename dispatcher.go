@@ -15,7 +15,7 @@ import (
 type dispatcher struct {
 	clientset *kubernetes.Clientset
 	nstenant  map[string]string // namespace_name: tenant_name 
-	nstschan map[string]chan *prompb.TimeSeries
+	nstschan map[string]chan prompb.TimeSeries
 	labelName string
 	interval int
 	proc *processor
@@ -24,8 +24,10 @@ type dispatcher struct {
 func newdispatcher(labelName string, interval int, proc *processor) (*dispatcher, error) {
 	k := &dispatcher{
 		nstenant: make(map[string]string),
+		nstschan: make(map[string]chan prompb.TimeSeries),
 		labelName: labelName,
 		proc: proc,
+		interval: interval,
 	}
 	config, err := rest.InClusterConfig()
 	if err != nil {
@@ -57,15 +59,24 @@ func (d *dispatcher) updateMap() (err error) {
 }
 
 func (d *dispatcher) updateBatchers() {
-	for tenant := range d.nstenant {
+	set := make(map[string]struct{})
+	set[d.proc.cfg.Tenant.Default] = struct{}{} // create batcher for default tenant
+	for _, v := range d.nstenant {
+		set[v] = struct{}{}
+	}
+
+	for tenant := range set {
 		_, ok := d.nstschan[tenant]
 		if !ok {
 			wk := createWorker(tenant, d.proc)
-			tschan := make(chan *prompb.TimeSeries)
+			tschan := make(chan prompb.TimeSeries)
+			log.Debugf("Create batcher for tenant: %s", tenant)
 			go wk.run(tschan)
+			d.nstschan[tenant] = tschan
 		}
 	}
 }
+
 func (d *dispatcher) run() {
 	ticker := time.NewTicker(time.Duration(d.interval) * time.Second)
 	for ; true; <-ticker.C {

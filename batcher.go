@@ -1,10 +1,12 @@
 package main
 
 import (
-	"fmt"
 	"time"
 
+	"github.com/golang/snappy"
 	"github.com/prometheus/prometheus/prompb"
+	log "github.com/sirupsen/logrus"
+	fh "github.com/valyala/fasthttp"
 )
 
 // func handle(){
@@ -23,45 +25,90 @@ import (
 //lint:file-ignore U1000 TDD
 
 const (
-    BATCHSIZE = 100
     TIMEOUT = 30
 )
 
-type timeseries_sender func(timeseries []*prompb.TimeSeries) error
+type timeseries_sender func(proc *processor, tenant string, timeseries []prompb.TimeSeries) (code int, body []byte, err error)
 
 type Worker struct {
     batchsize int
     timeout int
     tenant string
-    buffer []*prompb.TimeSeries
+    buffer []prompb.TimeSeries
     sender timeseries_sender
     proc *processor
 }
 
-func send_timeseries(timeseries []*prompb.TimeSeries) error {
-    fmt.Println("mando timeseries veramente")
-    return nil
+func marshal(wr *prompb.WriteRequest) (bufOut []byte, err error) {
+	b := make([]byte, wr.Size())
+	// Marshal to Protobuf
+	if _, err = wr.MarshalTo(b); err != nil {
+		return
+	}
+	// Compress with Snappy
+	return snappy.Encode(nil, b), nil
+}
+
+
+func send_timeseries(proc *processor, tenant string, timeseries []prompb.TimeSeries) (code int, body []byte, err error) {
+    req := fh.AcquireRequest()
+	resp := fh.AcquireResponse()
+
+    defer func() {
+		fh.ReleaseRequest(req)
+		fh.ReleaseResponse(resp)
+	}()
+
+    wr := prompb.WriteRequest{
+        Timeseries: timeseries,
+    }
+
+	buf, err := marshal(&wr)
+	if err != nil {
+		return
+	}
+
+    req.Header.SetMethod("POST")
+	req.Header.Set("Content-Encoding", "snappy")
+	req.Header.Set("Content-Type", "application/x-protobuf")
+	req.Header.Set("X-Prometheus-Remote-Write-Version", "0.1.0")
+	req.Header.Set(proc.cfg.Tenant.Header, tenant)
+	req.SetRequestURI(proc.cfg.Target)
+	req.SetBody(buf)
+	if err = proc.cli.DoTimeout(req, resp, proc.cfg.Timeout); err != nil {
+		return
+	}
+
+	code = resp.Header.StatusCode()
+	body = make([]byte, len(resp.Body()))
+	copy(body, resp.Body())
+
+    if code != fh.StatusOK {
+        log.Errorf("Error on senting writerequest to Cortex: code %d Body %s", code, body)
+    }
+    return
 }
 
 func createWorker(tenant string, proc *processor) *Worker{
     return &Worker{
-        batchsize: BATCHSIZE,
+        batchsize: proc.cfg.Tenant.BatchSize,
         timeout: TIMEOUT,
         tenant: tenant,
-        buffer: make([]*prompb.TimeSeries, 0, BATCHSIZE),
+        buffer: make([]prompb.TimeSeries, 0, proc.cfg.Tenant.BatchSize),
         sender: send_timeseries,
         proc: proc,
     }
 }
 
 func (w *Worker) flush_buffer() {
-    cpy := make([]*prompb.TimeSeries, len(w.buffer))
+    cpy := make([]prompb.TimeSeries, len(w.buffer))
     copy(cpy, w.buffer)
-    go w.sender(cpy)
+    log.Debugf("flushing batcher for tenant: %s", w.tenant)
+    go w.sender(w.proc, w.tenant, cpy)
     w.buffer = w.buffer[:0]
 }
 
-func (w *Worker) run(tschan <-chan *prompb.TimeSeries){
+func (w *Worker) run(tschan <-chan prompb.TimeSeries){
     // quando le timeseries sono tot o è passato tot tempo le manda
     for {
         select {
