@@ -1,6 +1,7 @@
-cortex-tenant
-sink
-generate
-.out
+*.DS_Store
+.idea
+.vscode
+coverage.out
 *.rpm
 *.deb
+dist/*
