@@ -8,8 +8,6 @@ require (
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/snappy v0.0.2
 	github.com/google/uuid v1.1.5
-	github.com/hashicorp/errwrap v1.1.0 // indirect
-	github.com/hashicorp/go-multierror v1.1.0
 	github.com/klauspost/compress v1.11.7 // indirect
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/prometheus v1.8.2-0.20210120113717-82330b96ee74
