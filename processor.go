@@ -12,6 +12,7 @@ import (
 	"github.com/gogo/protobuf/proto"
 	"github.com/golang/snappy"
 	"github.com/google/uuid"
+	me "github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	"github.com/prometheus/prometheus/prompb"
 	log "github.com/sirupsen/logrus"
@@ -125,48 +126,53 @@ func (p *processor) handle(ctx *fh.RequestCtx) {
 
 	log.Debugf("incoming timeseries numbers: %d", len(wrReqIn.Timeseries))
 
-	for _, ts := range wrReqIn.Timeseries {
-		tenant, err := p.processTimeseries(&ts)
-		if err != nil {
-			ctx.Error(err.Error(), fh.StatusInternalServerError)
-			return
+
+	if p.cfg.Tenant.NamespaceLabel != "" {
+		for _, ts := range wrReqIn.Timeseries {
+			tenant, err := p.processTimeseries(&ts)
+			if err != nil {
+				ctx.Error(err.Error(), fh.StatusInternalServerError)
+				return
+			}
+			_, ok := p.disp.nstschan[tenant]
+			if !ok {
+				log.Errorf("Not found chan for tenant: %s", tenant)
+			}
+			p.disp.nstschan[tenant] <- ts
 		}
-		_, ok := p.disp.nstschan[tenant]
-		if !ok {
-			log.Errorf("Not found chan for tenant: %s", tenant)
-		}
-		p.disp.nstschan[tenant] <- ts
+		ctx.SetStatusCode(fh.StatusOK)
+		return 
 	}
-	// clientIP := ctx.RemoteAddr()
-	// reqID, _ := uuid.NewRandom()
+	clientIP := ctx.RemoteAddr()
+	reqID, _ := uuid.NewRandom()
 
-	// m, err := p.createWriteRequests(wrReqIn)
-	// if err != nil {
-	// 	ctx.Error(err.Error(), fh.StatusBadRequest)
-	// 	return
-	// }
+	m, err := p.createWriteRequests(wrReqIn)
+	if err != nil {
+		ctx.Error(err.Error(), fh.StatusBadRequest)
+		return
+	}
 
-	// var errs *me.Error
-	// results := p.dispatch(clientIP, reqID, m)
+	var errs *me.Error
+	results := p.dispatch(clientIP, reqID, m)
 
-	// for _, r := range results {
-	// 	if r.err != nil {
-	// 		errs = me.Append(errs, r.err)
-	// 		p.Errorf("src=%s %s", clientIP, r.err)
-	// 	} else if r.code < 200 || r.code >= 300 {
-	// 		errs = me.Append(errs, fmt.Errorf("HTTP code %d (%s)", r.code, string(r.body)))
-	// 		p.Errorf("src=%s req_id=%s HTTP code %d (%s)", clientIP, reqID, r.code, string(r.body))
-	// 	}
-	// }
+	for _, r := range results {
+		if r.err != nil {
+			errs = me.Append(errs, r.err)
+			p.Errorf("src=%s %s", clientIP, r.err)
+		} else if r.code < 200 || r.code >= 300 {
+			errs = me.Append(errs, fmt.Errorf("HTTP code %d (%s)", r.code, string(r.body)))
+			p.Errorf("src=%s req_id=%s HTTP code %d (%s)", clientIP, reqID, r.code, string(r.body))
+		}
+	}
 
-	// // Return 500 for any error
-	// if errs.ErrorOrNil() != nil {
-	// 	ctx.Error(errs.Error(), fh.StatusInternalServerError)
-	// 	return
-	// }
+	// Return 500 for any error
+	if errs.ErrorOrNil() != nil {
+		ctx.Error(errs.Error(), fh.StatusInternalServerError)
+		return
+	}
 
-	// // Otherwise if all went fine return the code and body from 1st request
-	// ctx.SetBody(results[0].body)
+	// Otherwise if all went fine return the code and body from 1st request
+	ctx.SetBody(results[0].body)
 	ctx.SetStatusCode(fh.StatusOK)
 }
 
