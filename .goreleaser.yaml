@@ -9,7 +9,9 @@ builds:
       - amd64
       - arm64
 dockers:
-- image_templates: ["ghcr.io/mia-platform/cortex-proxy:{{ .Version }}"]
+- image_templates: 
+    - "ghcr.io/mia-platform/cortex-proxy:{{ .Version }}"
+    - "ghcr.io/mia-platform/cortex-proxy:latest"
   dockerfile: Dockerfile
   build_flag_templates:
   - --label=org.opencontainers.image.title={{ .ProjectName }}
