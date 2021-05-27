@@ -17,13 +17,13 @@ type config struct {
 	TimeoutShutdown time.Duration `yaml:"timeout_shutdown"`
 
 	Tenant struct {
-		Label       string `yaml:"label,omitempty"`
-		LabelRemove bool `yaml:"label_remove,omitempty"`
+		Label          string `yaml:"label,omitempty"`
+		LabelRemove    bool   `yaml:"label_remove,omitempty"`
 		NamespaceLabel string `yaml:"namespace_label,omitempty"`
-		BatchSize int `yaml:"batch_size,omitempty"`
-		QueryInterval int `yaml:"query_interval,omitempty"`
-		Header      string
-		Default     string
+		BatchSize      int    `yaml:"batch_size,omitempty"`
+		QueryInterval  int    `yaml:"query_interval,omitempty"`
+		Header         string
+		Default        string
 	}
 
 	pipeIn  *fhu.InmemoryListener

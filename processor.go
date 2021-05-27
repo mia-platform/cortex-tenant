@@ -26,7 +26,7 @@ type result struct {
 }
 
 type processor struct {
-	cfg config
+	cfg  config
 	disp *dispatcher
 
 	srv *fh.Server
@@ -40,7 +40,7 @@ type processor struct {
 func newProcessor(c config, disp *dispatcher) *processor {
 	p := &processor{
 		cfg:    c,
-		disp:    disp,
+		disp:   disp,
 		Logger: logger.NewSimpleLogger("proc"),
 	}
 
@@ -126,7 +126,6 @@ func (p *processor) handle(ctx *fh.RequestCtx) {
 
 	log.Debugf("incoming timeseries numbers: %d", len(wrReqIn.Timeseries))
 
-
 	if p.cfg.Tenant.NamespaceLabel != "" {
 		for _, ts := range wrReqIn.Timeseries {
 			tenant, err := p.processTimeseries(&ts)
@@ -141,7 +140,7 @@ func (p *processor) handle(ctx *fh.RequestCtx) {
 			p.disp.nstschan[tenant] <- ts
 		}
 		ctx.SetStatusCode(fh.StatusOK)
-		return 
+		return
 	}
 	clientIP := ctx.RemoteAddr()
 	reqID, _ := uuid.NewRandom()
@@ -256,7 +255,7 @@ func (p *processor) processTimeseries(ts *prompb.TimeSeries) (tenant string, err
 				break
 			}
 		}
-	} else {	
+	} else {
 		idx = 0
 		for i, l := range ts.Labels {
 			if l.Name == p.cfg.Tenant.Label {
@@ -265,7 +264,7 @@ func (p *processor) processTimeseries(ts *prompb.TimeSeries) (tenant string, err
 			}
 		}
 	}
-		
+
 	if tenant == "" {
 		if p.cfg.Tenant.Default == "" {
 			return "", fmt.Errorf("label '%s' not found", p.cfg.Tenant.Label)
@@ -275,7 +274,7 @@ func (p *processor) processTimeseries(ts *prompb.TimeSeries) (tenant string, err
 	}
 
 	// Remove label if label_remove = true
-	if p.cfg.Tenant.LabelRemove && p.cfg.Tenant.NamespaceLabel == ""{
+	if p.cfg.Tenant.LabelRemove && p.cfg.Tenant.NamespaceLabel == "" {
 		l := len(ts.Labels)
 		ts.Labels[idx] = ts.Labels[l-1]
 		ts.Labels = ts.Labels[:l-1]

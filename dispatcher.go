@@ -11,23 +11,22 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-
 type dispatcher struct {
 	clientset *kubernetes.Clientset
-	nstenant  map[string]string // namespace_name: tenant_name 
-	nstschan map[string]chan prompb.TimeSeries
+	nstenant  map[string]string // namespace_name: tenant_name
+	nstschan  map[string]chan prompb.TimeSeries
 	labelName string
-	interval int
-	proc *processor
+	interval  int
+	proc      *processor
 }
 
 func newdispatcher(labelName string, interval int, proc *processor) (*dispatcher, error) {
 	k := &dispatcher{
-		nstenant: make(map[string]string),
-		nstschan: make(map[string]chan prompb.TimeSeries),
+		nstenant:  make(map[string]string),
+		nstschan:  make(map[string]chan prompb.TimeSeries),
 		labelName: labelName,
-		proc: proc,
-		interval: interval,
+		proc:      proc,
+		interval:  interval,
 	}
 	config, err := rest.InClusterConfig()
 	if err != nil {
@@ -41,16 +40,16 @@ func newdispatcher(labelName string, interval int, proc *processor) (*dispatcher
 
 	return k, nil
 }
-	
+
 func (d *dispatcher) updateMap() (err error) {
 	nsList, err := d.clientset.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
-		return(err)
+		return (err)
 	}
-	
+
 	for _, ns := range nsList.Items {
 		if ns.ObjectMeta.Labels[d.labelName] != "" {
-			d.nstenant[ns.ObjectMeta.Name] = ns.ObjectMeta.Labels[d.labelName] 
+			d.nstenant[ns.ObjectMeta.Name] = ns.ObjectMeta.Labels[d.labelName]
 		} else {
 			delete(d.nstenant, ns.ObjectMeta.Name)
 		}

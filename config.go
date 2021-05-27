@@ -12,7 +12,6 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-
 func configParse(b []byte) (*config, error) {
 	cfg := &config{}
 	if err := yaml.UnmarshalStrict(b, cfg); err != nil {

@@ -44,7 +44,7 @@ func main() {
 
 		log.SetLevel(lvl)
 	}
-	
+
 	var disp *dispatcher
 	proc := newProcessor(*cfg, disp)
 
