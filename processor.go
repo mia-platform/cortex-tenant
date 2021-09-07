@@ -137,6 +137,9 @@ func (p *processor) handle(ctx *fh.RequestCtx) {
 			if !ok {
 				log.Errorf("Not found chan for tenant: %s", tenant)
 			}
+			if p.cfg.Tenant.DuplicateToDefault && tenant != p.cfg.Tenant.Default {
+				p.disp.nstschan[p.cfg.Tenant.Default] <- ts
+			}
 			p.disp.nstschan[tenant] <- ts
 		}
 		ctx.SetStatusCode(fh.StatusOK)

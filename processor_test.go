@@ -145,11 +145,6 @@ func sinkHandler(ctx *fh.RequestCtx) {
 	ctx.WriteString("Ok")
 }
 
-func Test_config(t *testing.T) {
-	_, err := configLoad("config.yml")
-	assert.Nil(t, err)
-}
-
 // func Test_handle(t *testing.T) {
 // 	cfg, err := configParse([]byte(testConfig))
 // 	assert.Nil(t, err)

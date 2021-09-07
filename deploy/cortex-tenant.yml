@@ -22,3 +22,6 @@ tenant:
   # will be rejected with HTTP code 400
   default: example
   batch_size: 500
+  # if true send all metrics to default tenant even the ones directed to different tenants
+  # the intended effect is to duplcate metrics
+  duplicate_to_default: false
