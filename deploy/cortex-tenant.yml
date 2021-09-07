@@ -1,10 +1,24 @@
-listen: 0.0.0.0:8080
-target: http://127.0.0.1:9091/receive
-log_level: warn
-timeout: 10s
+# Where to listen for incoming write requests from Prometheus
+listen: 0.0.0.0:8034
+# Profiling API, remove to disable
+listen_pprof: 0.0.0.0:7008
+# Where to send the modified requests (Cortex)
+target: https://example.com/api/v1/push
+# Log level
+log_level: info
+# HTTP request timeout
+timeout: 60s
+# Timeout to wait on shutdown to allow load balancers detect that we're going away.
+# During this period after the shutdown command the /alive endpoint will reply with HTTP 503.
+# Set to 0s to disable.
+timeout_shutdown: 60s
 
 tenant:
-  label: __tenant__
-  label_remove: true
-  header: X-Scope-OrgID
-  default: default
+  query_interval: 60
+  # To which header to add the tenant ID
+  header: X-Scope-OrgId
+  # Which tenant ID to use if the label is missing in any of the timeseries
+  # If this is not set or empty then the write request with missing tenant label
+  # will be rejected with HTTP code 400
+  default: example
+  batch_size: 500

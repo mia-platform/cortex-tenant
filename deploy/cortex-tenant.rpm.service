@@ -1,18 +1,16 @@
 [Unit]
 Description=Cortex-Tenant
-Documentation=https://github.com/blind-oracle/cortex-tenant
+Documentation=https://github.com/mia-platform/cortex-tenant
 Wants=network-online.target
 After=network-online.target
 
 [Service]
-Restart=always
-User=cortex-tenant
-EnvironmentFile=/etc/sysconfig/cortex-tenant
-ExecStart=/usr/sbin/cortex-tenant -config $CONFIG_FILE
+Restart=on-failure
+User=gitlab-prometheus
+Environment=AUTH_USER_PASS=user:password
+ExecStart=/usr/bin/cortex-tenant -config /etc/cortex-tenant.yml
 ExecReload=/bin/kill -HUP $MAINPID
-TimeoutStopSec=30
-SendSIGKILL=no
-WorkingDirectory=/var/lib/cortex-tenant
+TimeoutStopSec=65
 
 [Install]
 WantedBy=multi-user.target
